@@ -1,0 +1,5 @@
+---
+# handlers file for g_auth_mod
+
+- name: restart ssh
+  service: name=ssh state=restarted

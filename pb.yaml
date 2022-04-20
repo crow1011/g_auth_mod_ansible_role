@@ -1,0 +1,10 @@
+---
+# This is the top-level playbook that defines our entire infrastructure.
+
+- name: tst
+  hosts: all
+  become: true
+
+
+  roles:
+    - g_auth_mod

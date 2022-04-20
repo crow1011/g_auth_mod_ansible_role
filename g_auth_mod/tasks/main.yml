@@ -1,0 +1,99 @@
+---
+# tasks file for g_auth_mod
+
+- name: Ensure required packages are installed
+  apt: pkg={{ item }} state=present
+  with_items:
+    - libpam-google-authenticator
+    - libpam0g-dev
+    - libqrencode4
+
+
+- name: "Create user accounts"
+  user:
+    name: "{{ item }}"
+  with_items: "{{ users_for_create }}"
+
+- name: "Add authorized keys"
+  authorized_key:
+    user: "{{ item }}"
+    key: "{{ lookup('file', 'files/'+ item + '.pub') }}"
+  with_items: "{{ users_for_create }}"
+
+- name: "Destroy user accounts"
+  user:
+    name: "{{ item }}"
+    state: absent
+    remove: yes
+  with_items: "{{ users_for_destroy }}"  
+
+- name: Turn off 2fa for user_for_turn_off_gauth 
+  ansible.builtin.file:
+    path: "/home/{{ item }}/.google_authenticator"
+    state: absent
+  with_items: "{{ user_for_turn_off_gauth }}"
+
+- name: Add pam_google_authenticator.so to PAM with nullok option
+  lineinfile: dest=/etc/pam.d/sshd
+              line="auth required pam_google_authenticator.so nullok"
+              insertafter=EOF
+              state=present
+              backup=true
+
+- name: Add pam_permit.so to PAM
+  lineinfile: dest=/etc/pam.d/sshd
+              line="auth required pam_permit.so"
+              insertafter=EOF
+              state=present
+              backup=true
+
+- name: Update sshd config to enable challenge responses
+  lineinfile: dest=/etc/ssh/sshd_config
+              regexp=^ChallengeResponseAuthentication
+              line="ChallengeResponseAuthentication yes"
+              state=present
+              backup=true
+
+- name: Update sshd config to disable PasswordAuthentication
+  lineinfile: dest=/etc/ssh/sshd_config
+              regexp="^PasswordAuthentication yes"
+              line="PasswordAuthentication no"
+              state=present
+              backup=true
+
+- name: Exclude ansible user from pam check
+  blockinfile:
+    path: /etc/ssh/sshd_config
+    insertafter: EOF
+    block: |
+      Match User {{ main_user_name }}
+          AuthenticationMethods publickey
+
+- name: Turn off password auth 
+  lineinfile: dest=/etc/pam.d/sshd
+              regexp="^@include common-auth"
+              line="# @include common-auth"
+              state=present
+              backup=true
+
+- name: Update sshd config to set AuthenticationMethods publickey,keyboard-interactive
+  lineinfile: dest=/etc/ssh/sshd_config
+              line="AuthenticationMethods publickey,keyboard-interactive"
+              insertbefore=BOF
+              state=present
+              backup=true
+
+- name: restart sshd
+  service: name=sshd state=restarted
+
+- name: Insert .google_authenticator file exist statement
+  blockinfile:
+    path: /etc/profile
+    insertafter: EOF
+    block: |
+      OTP_FILE="$HOME/.google_authenticator"
+      if [ ! -f "$OTP_FILE" ] && [ $USER != {{ main_user_name }} ]; then
+          echo "$OTP_FILE does not exists  for  $USER"
+          google-authenticator -t -d -f -r 3 -R 30 -w 3
+          echo "ATTENTION! Set Up Multi-Factor Authentication."
+      fi  
