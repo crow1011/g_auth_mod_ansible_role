@@ -9,7 +9,7 @@
     - libqrencode4
 
 
-- name: "Create user accounts"
+- name: "Create users accounts"
   user:
     name: "{{ item }}"
   with_items: "{{ users_for_create }}"
@@ -20,18 +20,18 @@
     key: "{{ lookup('file', 'files/'+ item + '.pub') }}"
   with_items: "{{ users_for_create }}"
 
-- name: "Destroy user accounts"
+- name: "Destroy users accounts"
   user:
     name: "{{ item }}"
     state: absent
     remove: yes
   with_items: "{{ users_for_destroy }}"  
 
-- name: Turn off 2fa for user_for_turn_off_gauth 
+- name: Turn off 2fa for users_for_turn_off_gauth 
   ansible.builtin.file:
     path: "/home/{{ item }}/.google_authenticator"
     state: absent
-  with_items: "{{ user_for_turn_off_gauth }}"
+  with_items: "{{ users_for_turn_off_gauth }}"
 
 - name: Add pam_google_authenticator.so to PAM with nullok option
   lineinfile: dest=/etc/pam.d/sshd
@@ -66,7 +66,7 @@
     path: /etc/ssh/sshd_config
     insertafter: EOF
     block: |
-      Match User {{ main_user_name }}
+      Match User {{ ansible_user }}
           AuthenticationMethods publickey
 
 - name: Turn off password auth 
@@ -92,7 +92,7 @@
     insertafter: EOF
     block: |
       OTP_FILE="$HOME/.google_authenticator"
-      if [ ! -f "$OTP_FILE" ] && [ $USER != {{ main_user_name }} ]; then
+      if [ ! -f "$OTP_FILE" ] && [ $USER != {{ ansible_user }} ]; then
           echo "$OTP_FILE does not exists  for  $USER"
           google-authenticator -t -d -f -r 3 -R 30 -w 3
           echo "ATTENTION! Set Up Multi-Factor Authentication."

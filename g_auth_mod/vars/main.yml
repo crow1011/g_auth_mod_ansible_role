@@ -1,6 +1,5 @@
 ---
 # vars file for g_auth_mod
-main_user_name: ansible_su
 users_for_create:
   - usr1
   - usr2
@@ -9,4 +8,4 @@ users_for_create:
 users_for_destroy:
   - usr3
 
-user_for_turn_off_gauth:
+users_for_turn_off_gauth:
